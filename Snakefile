@@ -1,3 +1,4 @@
+configfile: "config.yaml"
 
 wildcard_constraints:
     lon="[0-9]+",
@@ -7,9 +8,9 @@ wildcard_constraints:
 rule solve_all:
     input:
         expand("networks/{value}-{lon}-{lat}.nc",
-	value=range(50,151,50),
-	lon=range(0,360,60),
-	lat=range(0,180,60))
+	value=range(config['value_start'],config['value_stop'],config['value_step']),
+	lon=range(0,360,config['lon_step']),
+	lat=range(0,180,config['lat_step']))
 
 
 rule solve:

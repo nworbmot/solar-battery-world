@@ -2,11 +2,6 @@ import pandas as pd, xarray as xr, numpy as np, os, pypsa
 from shapely.geometry import box, Point
 import matplotlib.pyplot as plt
 
-octant_folder = "../octants/"
-defaults_file = "elasticity/defaults.csv"
-tech_years_default = 2030
-tech_years = [2020, 2030, 2040, 2050]
-
 # following from whobs-server/solve.py
 
 def find_interval(interval_start,interval_length,value):
@@ -83,7 +78,7 @@ def pu_from_coordinates(lon,lat,year):
     pu = {}
 
     for tech in ["solar", "onwind"]:
-        filename = os.path.join(octant_folder,
+        filename = os.path.join(snakemake.config['octant_folder'],
 				f"octant-{year}-{quadrant}-{hemisphere}-{tech}.nc")
         o = xr.open_dataarray(filename)
 
@@ -91,17 +86,17 @@ def pu_from_coordinates(lon,lat,year):
 
     return pd.DataFrame(pu)
 
-defaults = pd.read_csv(defaults_file,index_col=[0,1],na_filter=False)
+defaults = pd.read_csv(snakemake.config['defaults_file'],index_col=[0,1],na_filter=False)
 
 for (n,t) in [("f",float),("i",int)]:
     defaults.loc[defaults["type"] == n, "value"] = defaults.loc[defaults["type"] == n,"value"].astype(t)
 #work around fact bool("False") returns True                                                                                                                                           
 defaults.loc[defaults.type == "b","value"] = (defaults.loc[defaults.type == "b","value"] == "True")
 
-defaults_t = {str(year): defaults.swaplevel().loc[str(year)] for year in tech_years}
+defaults_t = {str(year): defaults.swaplevel().loc[str(year)] for year in snakemake.config['tech_years']}
 defaults_nt = defaults.swaplevel().loc[""]
 
-default_assumptions = pd.concat((defaults_nt,defaults_t[str(tech_years_default)])).sort_index()
+default_assumptions = pd.concat((defaults_nt,defaults_t[str(snakemake.config['tech_years_default'])])).sort_index()
 
 def annuity(lifetime,rate):
     if rate == 0.:
@@ -271,17 +266,18 @@ if __name__ == "__main__":
 
         snakemake = SimpleNamespace()
 
-        #with open('config.yaml') as f:
-        #+    snakemake.config = yaml.safe_load(f)
+        with open('config.yaml') as f:
+            snakemake.config = yaml.safe_load(f)
 
-        snakemake.wildcards = Dict({"country" : "DE",
-                                    # "scenario" : "71a-1H-H2s",
-                                    # "scenario" : "71a-1H-H2s-wm-nH2t-mflex0-ramp10",
-                                    "scenario" : "1a-1H-H2s-wm-nH2t-mflex0-ramp10",
+        snakemake.wildcards = Dict({"value" : 50,
+                                    "lon" : 10,
+                                    "lat" : 50,
                                     })
 
-        snakemake.output = ["results/{}-{}.nc".format(snakemake.wildcards.country,
-                                                         snakemake.wildcards.scenario)]
+        snakemake.output = ["networks/{}-{}-{}.nc".format(snakemake.wildcards.value,
+                                                          snakemake.wildcards.lon,
+                                                          snakemake.wildcards.lat,
+                                                          )]
         snakemake.log = {
             "python": f"logs/{snakemake.wildcards['country']}-{snakemake.wildcards['scenario']}-python.log",
             "solver": f"logs/{snakemake.wildcards['country']}-{snakemake.wildcards['scenario']}-solver.log",
