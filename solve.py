@@ -138,9 +138,6 @@ def solve(assumptions,pu):
 
     load = assumptions["load"]
 
-    load = assumptions["load"]
-
-
     if assumptions["voll"]:
     	network.add("Generator","load",
                     bus="electricity",
@@ -149,6 +146,12 @@ def solve(assumptions,pu):
                     p_max_pu=0,
                     p_min_pu=-1,
                     p_nom=assumptions["load"])
+    else:
+        network.add("Load","load",
+                    bus="electricity",
+                    carrier="load",
+                    p_set=assumptions["load"])
+
 
     if assumptions["solar"]:
         network.add("Generator","solar",
@@ -301,8 +304,19 @@ if __name__ == "__main__":
 
     assumptions = default_assumptions["value"].to_dict()
     assumptions["frequency"] = 1.
-    assumptions["voll"] = True
-    assumptions["voll_price"] = snakemake.wildcards.value
+
+    scenario = snakemake.wildcards.scenario
+
+    opts = scenario.split("+")
+
+    for opt in opts:
+        if opt == "vanilla":
+            continue
+        elif opt == "nowind":
+            assumptions["wind"] = False
+        elif opt[:4] == "voll":
+            assumptions["voll"] = True
+            assumptions["voll_price"] = int(opt[4:])
 
     n = solve(assumptions,pu)
 
