@@ -232,8 +232,15 @@ def solve(assumptions,pu):
                     e_nom_extendable=True,
                     e_cyclic=True,
                     capital_cost=assumptions_df.at["liquid_carbonaceous_storage","fixed"]/4.4)
-    
-    
+
+    if assumptions["fossil"]:
+        network.add("Generator",
+                    "fossil",
+                    bus="chemical",
+                    carrier="fossil",
+                    marginal_cost=assumptions["fossil_price"],
+                    p_nom_extendable=True)
+
     network.consistency_check()
 
     solver_name = "gurobi"
@@ -304,6 +311,8 @@ if __name__ == "__main__":
 
     assumptions = default_assumptions["value"].to_dict()
     assumptions["frequency"] = 1.
+    assumptions["fossil"] = False
+    assumptions["fossil_price"] = 50.
 
     scenario = snakemake.wildcards.scenario
 
@@ -317,6 +326,9 @@ if __name__ == "__main__":
         elif opt[:4] == "voll":
             assumptions["voll"] = True
             assumptions["voll_price"] = int(opt[4:])
+        elif opt[:6] == "fossil":
+            assumptions["fossil"] = True
+            assumptions["fossil_price"] = float(opt[6:])
 
     n = solve(assumptions,pu)
 
