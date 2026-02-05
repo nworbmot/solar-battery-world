@@ -1,12 +1,13 @@
 
-run: "260202-tech2050"
+run: "260204-above1e7"
 
-scenarios: ["fossil50+nowind","fossil50","nowind","vanilla"]
+scenarios: ["vanilla"]#"fossil50+nowind","fossil50","nowind","vanilla"]
 
-lon_step: 10
-lat_step: 10
+point_list: "population_by_coord.csv"
+threshold: 1.2e6
+
 
 octant_folder: "../octants/"
 defaults_file: "defaults.csv"
-tech_years_default: 2050
+tech_years_default: 2030
 tech_years: [2020, 2030, 2040, 2050]

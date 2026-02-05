@@ -295,12 +295,14 @@ if __name__ == "__main__":
 
     year = 2011
 
-    lon = int(snakemake.wildcards.lon)
+    lonlat = snakemake.wildcards.lonlat
+    lon = int(lonlat[:lonlat[1:].find("-")+1])
+    lat = int(lonlat[lonlat[1:].find("-")+2:])
+
+    print(f"{lonlat} -> {lon},{lat}")
 
     if lon >= 180:
         lon -= 360
-
-    lat = int(snakemake.wildcards.lat)
 
     if lat >= 90:
         lat -= 180

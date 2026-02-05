@@ -1,21 +1,25 @@
 configfile: "config.yaml"
 
+import pandas as pd
+
+s = pd.read_csv(config['point_list'],index_col=[0,1])
+
+lonlats = [f"{lon}-{lat}" for (lon,lat), value in s.itertuples() if value > float(config['threshold'])]
+
 wildcard_constraints:
-    lon="[0-9]+",
-    lat="[0-9]+",
+    lonlat="[-0-9]+",
     scenario="[+a-z0-9]+"
 
 rule solve_all:
     input:
-        expand("networks/" + config['run'] + "/{scenario}-{lon}-{lat}.nc",
+        expand("networks/" + config['run'] + "/{scenario}-{lonlat}.nc",
 	scenario=config['scenarios'],
-	lon=range(0,360,config['lon_step']),
-	lat=range(0,180,config['lat_step']))
+	lonlat=lonlats)
 
 
 rule solve:
     output:
-        "networks/" + config['run'] + "/{scenario}-{lon}-{lat}.nc"
+        "networks/" + config['run'] + "/{scenario}-{lonlat}.nc"
     threads: 4
     resources:
         mem_mb=2000
