@@ -12,15 +12,22 @@ wildcard_constraints:
 
 rule solve_all:
     input:
-        expand("networks/" + config['run'] + "/{scenario}-{lonlat}.nc",
+        #expand("networks/" + config['run'] + "/{scenario}-{lonlat}.nc",
+        expand("csvs/" + config['run'] + "/{scenario}-{lonlat}.csv",
 	scenario=config['scenarios'],
 	lonlat=lonlats)
 
 
 rule solve:
     output:
-        "networks/" + config['run'] + "/{scenario}-{lonlat}.nc"
+        #network="networks/" + config['run'] + "/{scenario}-{lonlat}.nc",
+        csv="csvs/" + config['run'] + "/{scenario}-{lonlat}.csv"
     threads: 4
     resources:
-        mem_mb=2000
+        mem_mb=2000,
+        runtime="48h",
+    log:
+        solver='logs/' + config['run'] + '/{scenario}-{lonlat}_solver.log',
+        memory='logs/' + config['run'] + '/{scenario}-{lonlat}_memory.log',
+        python='logs/' + config['run'] + '/{scenario}-{lonlat}_python.log',
     script: "solve.py"

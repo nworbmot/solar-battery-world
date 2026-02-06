@@ -104,6 +104,66 @@ def annuity(lifetime,rate):
     else:
         return rate/(1. - 1. / (1. + rate)**lifetime)
 
+
+
+def generate_overview(network):
+
+    results_overview = n.buses_t.marginal_price.mean().rename(lambda n : f"{n} average price")
+    results_overview.index.name = ""
+
+    total_load = network.loads.at["load","p_set"]
+
+    stats = network.statistics().groupby(level=1).sum()
+
+    stats["Total Expenditure"] = stats[["Capital Expenditure","Operational Expenditure"]].sum(axis=1)
+
+    for name,full_name in [("capex","Capital Expenditure"),("opex","Operational Expenditure"),("totex","Total Expenditure"),("capacity","Optimal Capacity")]:
+        results_overview = pd.concat((results_overview,
+                                      stats[full_name].rename(lambda x: x+ f" {name}")))
+
+    results_overview["average_cost"] = sum([results_overview[s] for s in results_overview.index if s[-6:] == " totex"])/total_load/8760.
+
+    #report capacity from p1 not p0
+    if "hydrogen turbine capacity" in results_overview:
+        results_overview.loc["hydrogen turbine capacity"] *= network.links.at["hydrogen_turbine","efficiency"]
+
+
+    results_overview = pd.concat((results_overview,
+                                  (stats["Curtailment"]/(stats["Supply"]+stats["Curtailment"])).rename(lambda x: x+ " curtailment")))
+
+    results_overview = pd.concat((results_overview,
+                                  (stats["Total Expenditure"]/(stats["Supply"])).rename(lambda x: x+ " LCOE")))
+
+    results_overview = pd.concat((results_overview,
+                                  stats["Capacity Factor"].rename(lambda x: x+ " cf used")))
+
+    results_overview = pd.concat((results_overview,
+                                  ((stats["Supply"]+stats["Curtailment"])/stats["Optimal Capacity"]/network.snapshot_weightings["generators"].sum()).rename(lambda x: x+ " cf available")))
+
+    #RMV
+    bus_map = (network.buses.carrier == "electricity")
+    bus_map.at[""] = False
+    for c in network.iterate_components(network.one_port_components):
+        items = c.df.index[c.df.bus.map(bus_map).fillna(False)]
+        if len(items) == 0:
+            continue
+        rmv = (c.pnl.p[items].multiply(network.buses_t.marginal_price["electricity"], axis=0).sum()/c.pnl.p[items].sum()).groupby(c.df.loc[items,'carrier']).mean()/results_overview["electricity average price"]
+        results_overview = pd.concat((results_overview,
+                                      rmv.rename(lambda x: x+ " rmv").replace([np.inf, -np.inf], np.nan).dropna()))
+
+    for c in network.iterate_components(network.branch_components):
+        for end in [col[3:] for col in c.df.columns if col[:3] == "bus"]:
+            items = c.df.index[c.df["bus" + str(end)].map(bus_map,na_action=None)]
+            if len(items) == 0:
+                continue
+            if c.pnl["p"+end].empty:
+                continue
+            rmv = (c.pnl["p"+end][items].multiply(network.buses_t.marginal_price["electricity"], axis=0).sum()/c.pnl["p"+end][items].sum()).groupby(c.df.loc[items,'carrier']).mean()/results_overview["electricity average price"]
+            results_overview = pd.concat((results_overview,
+                                          rmv.rename(lambda x: x+ " rmv").replace([np.inf, -np.inf], np.nan).dropna()))
+
+    return results_overview
+
 #from elasticity/solve
 def solve(assumptions,pu):
     assumptions_df = pd.DataFrame(columns=["FOM","fixed","discount rate","lifetime","investment"],
@@ -202,21 +262,22 @@ def solve(assumptions,pu):
                     p_nom_extendable = True,
                     efficiency = assumptions["battery_power_efficiency_discharging"]/100.)
 
-    network.add("Bus",
-                "chemical",
-                carrier="chemical")
+    if assumptions["hydrogen"]:
+        network.add("Bus",
+                    "chemical",
+                    carrier="chemical")
 
 
-    network.add("Link",
-                "hydrogen_turbine",
-                bus0="chemical",
-                bus1="electricity",
-                carrier="hydrogen turbine",
-                p_nom_extendable=True,
-                efficiency=assumptions["hydrogen_turbine_efficiency"]/100.,
-        		capital_cost=assumptions_df.at["hydrogen_turbine","fixed"]*assumptions["hydrogen_turbine_efficiency"]/100.)  #NB: fixed cost is per MWel 
+        network.add("Link",
+                    "hydrogen_turbine",
+                    bus0="chemical",
+                    bus1="electricity",
+                    carrier="hydrogen turbine",
+                    p_nom_extendable=True,
+                    efficiency=assumptions["hydrogen_turbine_efficiency"]/100.,
+                    capital_cost=assumptions_df.at["hydrogen_turbine","fixed"]*assumptions["hydrogen_turbine_efficiency"]/100.)  #NB: fixed cost is per MWel 
     
-    network.add("Link",
+        network.add("Link",
                     "methanol synthesis",
                     bus0="electricity",
                     bus1="chemical",
@@ -225,7 +286,7 @@ def solve(assumptions,pu):
                     efficiency=0.5,
                     capital_cost=assumptions_df.at["hydrogen_electrolyser","fixed"]+assumptions_df.at["methanolisation","fixed"]*assumptions["methanolisation_efficiency"]) #NB: cost is EUR/kW_MeOH                                                                                                                                                                         
 
-    network.add("Store",
+        network.add("Store",
                     "methanol",
                     bus="chemical",
                     carrier="methanol storage",
@@ -240,6 +301,23 @@ def solve(assumptions,pu):
                     carrier="fossil",
                     marginal_cost=assumptions["fossil_price"],
                     p_nom_extendable=True)
+
+    for i in range(1,3):
+        name = "dispatchable" + str(i)
+        if assumptions[name]:
+            network.add("Carrier",name,
+                        co2_emissions=assumptions[name+"_emissions"])
+            network.add("Generator",name,
+                        bus="electricity",
+                        carrier=name,
+                        p_nom_extendable=True,
+                        marginal_cost=assumptions[name+"_marginal_cost"],
+                        capital_cost=assumptions_df.at[name,'fixed'])
+
+    if assumptions["co2_limit"]:
+        network.add("GlobalConstraint","co2_limit",
+                    sense="<=",
+                    constant=assumptions["co2_emissions"]*assumptions["load"]*network.snapshot_weightings.objective.sum())
 
     network.consistency_check()
 
@@ -260,6 +338,7 @@ def solve(assumptions,pu):
 
 
     status, termination_condition = network.optimize.solve_model(solver_name=solver_name,
+                                                                 log_fn=snakemake.log.solver,
                                                                  solver_options=solver_options)
 
         
@@ -331,10 +410,26 @@ if __name__ == "__main__":
         elif opt[:6] == "fossil":
             assumptions["fossil"] = True
             assumptions["fossil_price"] = float(opt[6:])
+        elif opt[:9] == "solarbatt":
+            assumptions["hydrogen"] = False
+            assumptions["wind"] = False
+            assumptions["dispatchable1"] = True
+            assumptions["dispatchable1_cost"] = 0.
+            assumptions["dispatchable1_emissions"] = 1000.
+            assumptions["dispatchable1_marginal_cost"] = 0.
+            assumptions["co2_limit"] = True
+            co2_emissions = (100-float(opt[9:]))*10
+            print(f"based on {opt[9:]} setting, restricting emissions to {co2_emissions}")
+            assumptions["co2_emissions"] = co2_emissions
+
 
     n = solve(assumptions,pu)
 
-    n.export_to_netcdf(snakemake.output[0],
-                       # compression of network
-                       float32=True, compression={'zlib': True, "complevel":9, "least_significant_digit":5}
-                       )
+    results_overview = generate_overview(n)
+
+    results_overview.to_csv(snakemake.output.csv)
+
+    #n.export_to_netcdf(snakemake.output[0],
+    #                   # compression of network
+    #                   float32=True, compression={'zlib': True, "complevel":9, "least_significant_digit":5}
+    #                   )
