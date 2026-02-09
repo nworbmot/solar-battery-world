@@ -65,6 +65,7 @@ static/d*
 
 !defaults.csv
 !defaults-initial.csv
+!population_by_coord.csv
 
 .snakemake*
 
