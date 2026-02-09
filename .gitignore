@@ -78,8 +78,6 @@ benchmarks/
 
 summaries
 
-*.txt
-
 networks
 
 solve_for_value_location.py
@@ -89,3 +87,7 @@ elasticity/
 population_comparison.py
 
 outputs/
+
+csvs
+
+*.png
