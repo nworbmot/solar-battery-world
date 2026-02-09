@@ -2,13 +2,16 @@
 # calculating the costs of solar-battery-fuel systems for the world
 
 This code calculates the cost of providing a constant demand with
-electricity from solar, batteries and a backup fuel generator, with
-the option to add wind and change the year for the technology
-assumptions.
+electricity from solar, batteries and a backup fuel generator for any
+point in the world, with the option to add wind and change the year
+for the technology assumptions.
 
-It is based on the online tool [https://model.energy/](model.energy)
- and uses [Python for Power System Analysis
- (PyPSA)](https://github.com/PyPSA/PyPSA) for the optimisation.
+The results are written up in a [2026 blog post](https://nworbmot.org/blog/solar-battery-world.html).
+
+The model is based on the online tool
+ [https://model.energy/](model.energy) and uses [Python for Power
+ System Analysis (PyPSA)](https://github.com/PyPSA/PyPSA) for the
+ optimisation.
 
 
 
