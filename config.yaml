@@ -1,10 +1,13 @@
 
 run: "260206-solarbatt2050"
 
-scenarios: ["solarbatt99","solarbatt95"]#,"solarbatt90"]#"fossil50+nowind","fossil50","nowind","vanilla"]
+scenarios: ["solarbatt90","solarbatt95","solarbatt99"]#,"solarbatt90"]#"fossil50+nowind","fossil50","nowind","vanilla"]
+
+lon_step: 1
+lat_step: 1
 
 point_list: "population_by_coord.csv"
-threshold: 1e6
+threshold: 1e4
 
 
 octant_folder: "../octants/"

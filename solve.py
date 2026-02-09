@@ -1,3 +1,18 @@
+## Copyright 2026 Tom Brown
+
+## This program is free software; you can redistribute it and/or
+## modify it under the terms of the GNU Affero General Public License as
+## published by the Free Software Foundation; either version 3 of the
+## License, or (at your option) any later version.
+
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU Affero General Public License for more details.
+
+## License and more information at:
+## https://github.com/nworbmot/solar-battery-world
+
 import pandas as pd, xarray as xr, numpy as np, os, pypsa
 from shapely.geometry import box, Point
 import matplotlib.pyplot as plt
@@ -420,6 +435,16 @@ if __name__ == "__main__":
             assumptions["co2_limit"] = True
             co2_emissions = (100-float(opt[9:]))*10
             print(f"based on {opt[9:]} setting, restricting emissions to {co2_emissions}")
+            assumptions["co2_emissions"] = co2_emissions
+        elif opt[:13] == "solarwindbatt":
+            assumptions["hydrogen"] = False
+            assumptions["dispatchable1"] = True
+            assumptions["dispatchable1_cost"] = 0.
+            assumptions["dispatchable1_emissions"] = 1000.
+            assumptions["dispatchable1_marginal_cost"] = 0.
+            assumptions["co2_limit"] = True
+            co2_emissions = (100-float(opt[13:]))*10
+            print(f"based on {opt[13:]} setting, restricting emissions to {co2_emissions}")
             assumptions["co2_emissions"] = co2_emissions
 
 
