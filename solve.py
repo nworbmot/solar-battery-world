@@ -201,7 +201,7 @@ def solve(assumptions,pu):
 
     assumptions_df["fixed"] = [(annuity(v["lifetime"],v["discount rate"])+v["FOM"]/100.)*v["investment"]*Nyears for i,v in assumptions_df.iterrows()]
     print(assumptions_df)
-    
+
     network = pypsa.Network()
 
     network.set_snapshots(pu.index)
@@ -446,6 +446,9 @@ if __name__ == "__main__":
             co2_emissions = (100-float(opt[13:]))*10
             print(f"based on {opt[13:]} setting, restricting emissions to {co2_emissions}")
             assumptions["co2_emissions"] = co2_emissions
+        elif opt[:8] == "battcost":
+            assumptions["battery_energy_cost"] = float(opt[8:])
+            print(f"battery energy cost changed to {assumptions['battery_energy_cost']}")
 
 
     n = solve(assumptions,pu)
