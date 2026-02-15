@@ -13,7 +13,7 @@
 ## License and more information at:
 ## https://github.com/nworbmot/solar-battery-world
 
-import pandas as pd, xarray as xr, numpy as np, os, pypsa
+import pandas as pd, xarray as xr, numpy as np, os, pypsa, sys
 from shapely.geometry import box, Point
 import matplotlib.pyplot as plt
 
@@ -110,8 +110,6 @@ defaults.loc[defaults.type == "b","value"] = (defaults.loc[defaults.type == "b",
 
 defaults_t = {str(year): defaults.swaplevel().loc[str(year)] for year in snakemake.config['tech_years']}
 defaults_nt = defaults.swaplevel().loc[""]
-
-default_assumptions = pd.concat((defaults_nt,defaults_t[str(snakemake.config['tech_years_default'])])).sort_index()
 
 def annuity(lifetime,rate):
     if rate == 0.:
@@ -405,17 +403,29 @@ if __name__ == "__main__":
                              lat,
                              year)
 
+
+    scenario = snakemake.wildcards.scenario
+
+    if 'tech20' in scenario:
+        tech_year = scenario[scenario.find('tech20')+4:scenario.find('tech20')+8]
+    else:
+        tech_year = str(snakemake.config['tech_years_default'])
+
+    print(f"Using technology assumptions for year {tech_year}")
+
+    default_assumptions = pd.concat((defaults_nt,defaults_t[tech_year])).sort_index()
+
     assumptions = default_assumptions["value"].to_dict()
     assumptions["frequency"] = 1.
     assumptions["fossil"] = False
     assumptions["fossil_price"] = 50.
 
-    scenario = snakemake.wildcards.scenario
-
     opts = scenario.split("+")
 
     for opt in opts:
         if opt == "vanilla":
+            continue
+        elif opt[:6] == "tech20":
             continue
         elif opt == "nowind":
             assumptions["wind"] = False
@@ -449,7 +459,9 @@ if __name__ == "__main__":
         elif opt[:8] == "battcost":
             assumptions["battery_energy_cost"] = float(opt[8:])
             print(f"battery energy cost changed to {assumptions['battery_energy_cost']}")
-
+        else:
+            print(f"option {opt} not recognised, quitting")
+            sys.exit()
 
     n = solve(assumptions,pu)
 
