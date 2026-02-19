@@ -8,6 +8,9 @@ for the technology assumptions.
 
 The results are written up in a [2026 blog post](https://nworbmot.org/blog/solar-battery-world.html).
 
+
+Data from example scenarios are available on [zenodo](https://zenodo.org/records/18699811).
+
 The model is based on the online tool
  [https://model.energy/](model.energy) and uses [Python for Power
  System Analysis (PyPSA)](https://github.com/PyPSA/PyPSA) for the
