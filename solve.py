@@ -124,7 +124,10 @@ def generate_overview(network):
     results_overview = n.buses_t.marginal_price.mean().rename(lambda n : f"{n} average price")
     results_overview.index.name = ""
 
-    total_load = network.loads.at["load","p_set"]
+    if "load" in network.loads.index:
+        total_load = network.loads.at["load","p_set"]
+    else:
+        total_load = network.generators_t["p"]["load"].mean()
 
     stats = network.statistics().groupby(level=1).sum()
 
@@ -349,6 +352,20 @@ def solve(assumptions,pu):
                                       network.model["Link-p_nom"].loc["battery_discharge"] == 0,
                                       name='charger_ratio')
 
+    if assumptions["maxcost"]:
+
+        objective = 0.
+        for component in ["Generator","Link","Store"]:
+            cost = network.static(component)["capital_cost"]
+            cost.index.name = f"{component}-ext"
+            if component == "Store":
+                attr = "e"
+            else:
+                attr = "p"
+            objective += (network.model[f"{component}-{attr}_nom"]*cost).sum()
+
+        network.model.add_constraints(objective == assumptions["maxcost_level"]*assumptions["load"]*8760,
+                                      name='maxcost')
 
     status, termination_condition = network.optimize.solve_model(solver_name=solver_name,
                                                                  log_fn=snakemake.log.solver,
@@ -419,6 +436,8 @@ if __name__ == "__main__":
     assumptions["frequency"] = 1.
     assumptions["fossil"] = False
     assumptions["fossil_price"] = 50.
+    assumptions["maxcost"] = False
+    assumptions["maxcost_level"] = 0.
 
     opts = scenario.split("+")
 
@@ -459,6 +478,12 @@ if __name__ == "__main__":
         elif opt[:8] == "battcost":
             assumptions["battery_energy_cost"] = float(opt[8:])
             print(f"battery energy cost changed to {assumptions['battery_energy_cost']}")
+        elif opt[:7] == "maxcost":
+            assumptions["hydrogen"] = False
+            assumptions["wind"] = False
+            assumptions["maxcost"] = True
+            assumptions["maxcost_level"] = float(opt[7:])
+            print(f"setting a maximum system cost to {assumptions['maxcost_level']} €/MWh")
         else:
             print(f"option {opt} not recognised, quitting")
             sys.exit()
